@@ -1,0 +1,490 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Blue Heart | For Dev</title>
+
+<style>
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  background: radial-gradient(ellipse at center, #102b59, #020617 75%);
+  color: #dbeafe;
+  font-family: Georgia, serif;
+  overflow: hidden;
+  height: 100dvh;
+  touch-action: manipulation;
+}
+
+canvas {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.game {
+  position: relative;
+  z-index: 2;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 30px 15px 20px;
+  pointer-events: none;
+}
+
+h1 {
+  font-size: 25px;
+  letter-spacing: 5px;
+  color: #bfdbfe;
+  text-shadow: 0 0 20px #3b82f6;
+}
+
+.subtitle {
+  font-size: 10px;
+  letter-spacing: 4px;
+  margin-top: 9px;
+  color: #60a5fa;
+}
+
+.stats {
+  display: flex;
+  gap: 30px;
+  margin-top: 30px;
+  font-size: 13px;
+  letter-spacing: 2px;
+  text-align: center;
+}
+
+.stat strong {
+  display: block;
+  color: #93c5fd;
+  font-size: 23px;
+  margin-top: 7px;
+}
+
+.center-heart {
+  position: absolute;
+  top: 47%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 85px;
+  filter: drop-shadow(0 0 18px #3b82f6);
+  animation: rotate 8s linear infinite,
+             beat 1.5s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes rotate {
+  from { transform: translate(-50%, -50%) rotateY(0deg); }
+  to { transform: translate(-50%, -50%) rotateY(360deg); }
+}
+
+@keyframes beat {
+  50% { filter: drop-shadow(0 0 35px #60a5fa); }
+}
+
+.instructions {
+  position: absolute;
+  top: 60%;
+  width: 85%;
+  text-align: center;
+  color: #bfdbfe;
+  font-size: 14px;
+  line-height: 1.8;
+  text-shadow: 0 0 10px #2563eb;
+}
+
+button {
+  pointer-events: auto;
+  background: rgba(37, 99, 235, .25);
+  color: #dbeafe;
+  border: 1px solid #60a5fa;
+  padding: 14px 25px;
+  border-radius: 30px;
+  font-size: 14px;
+  letter-spacing: 2px;
+  box-shadow: 0 0 20px #2563eb;
+  cursor: pointer;
+}
+
+button:active {
+  transform: scale(.92);
+  background: #2563eb;
+}
+
+#start {
+  position: absolute;
+  bottom: 15%;
+}
+
+#message {
+  display: none;
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  background: rgba(2, 6, 23, .93);
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  text-align: center;
+  padding: 30px;
+}
+
+#message h2 {
+  font-size: 27px;
+  color: #93c5fd;
+  text-shadow: 0 0 25px #3b82f6;
+  margin-bottom: 20px;
+}
+
+#message p {
+  font-size: 22px;
+  line-height: 1.7;
+  color: #dbeafe;
+  max-width: 330px;
+  margin-bottom: 25px;
+}
+
+#message .final-heart {
+  font-size: 75px;
+  animation: beat 1s infinite;
+  margin-bottom: 20px;
+}
+
+.footer {
+  position: absolute;
+  bottom: 4%;
+  color: #60a5fa;
+  font-size: 9px;
+  letter-spacing: 4px;
+}
+</style>
+</head>
+
+<body>
+
+<canvas id="canvas"></canvas>
+
+<div class="game">
+  <h1>BLUE HEART</h1>
+  <div class="subtitle">A LITTLE GAME FOR DEV</div>
+
+  <div class="stats">
+    <div class="stat">
+      HEARTS
+      <strong id="score">0</strong>
+    </div>
+    <div class="stat">
+      GOAL
+      <strong>20</strong>
+    </div>
+    <div class="stat">
+      MISSES
+      <strong id="misses">0/5</strong>
+    </div>
+  </div>
+
+  <div class="center-heart">💙</div>
+
+  <div class="instructions" id="instructions">
+    Atrapa los corazones azules que aparecen.<br>
+    Consigue 20 para descubrir tu sorpresa.
+  </div>
+
+  <button id="start">COMENZAR JUEGO ✦</button>
+
+  <div class="footer">MADE WITH LOVE · FOR DEV</div>
+</div>
+
+<div id="message">
+  <div class="final-heart">💙</div>
+  <h2>YOU WON!</h2>
+  <p>Te adoro y te amo más de lo que crees</p>
+  <div style="color:#93c5fd;margin-bottom:25px">
+    Eres mi corazón favorito.
+  </div>
+  <button id="restart">VOLVER A JUGAR</button>
+</div>
+
+<script>
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+let w, h, dpr;
+let score = 0;
+let misses = 0;
+let playing = false;
+let hearts = [];
+let particles = [];
+let backgroundParticles = [];
+let lastSpawn = 0;
+let animationId;
+
+const colors = [
+  "#3b82f6",
+  "#93c5fd",
+  "#bfdbfe",
+  "#60a5fa",
+  "#2563eb",
+  "#1d4ed8"
+];
+
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  w = innerWidth;
+  h = innerHeight;
+
+  canvas.width = w * dpr;
+  canvas.height = h * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+resize();
+window.addEventListener("resize", resize);
+
+function randomColor() {
+  return colors[Math.floor(Math.random() * colors.length)];
+}
+
+class Star {
+  constructor() {
+    this.x = Math.random() * w;
+    this.y = Math.random() * h;
+    this.size = Math.random() * 2 + .5;
+    this.speed = Math.random() * .5 + .15;
+    this.alpha = Math.random();
+  }
+
+  update() {
+    this.y -= this.speed;
+    this.alpha += .015;
+
+    if (this.y < 0) {
+      this.y = h;
+      this.x = Math.random() * w;
+    }
+  }
+
+  draw() {
+    ctx.globalAlpha = .3 + Math.abs(Math.sin(this.alpha)) * .7;
+    ctx.fillStyle = "#93c5fd";
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = "#3b82f6";
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.shadowBlur = 0;
+  }
+}
+
+class Heart {
+  constructor() {
+    this.x = 25 + Math.random() * (w - 50);
+    this.y = -30;
+    this.speed = 1.5 + Math.random() * 1.3;
+    this.size = 18 + Math.random() * 9;
+    this.color = randomColor();
+    this.angle = 0;
+    this.rotation = Math.random() * .04;
+  }
+
+  update() {
+    this.y += this.speed;
+    this.angle += this.rotation;
+  }
+
+  draw() {
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    ctx.rotate(Math.sin(this.angle) * .2);
+    ctx.scale(this.size / 25, this.size / 25);
+
+    ctx.shadowBlur = 18;
+    ctx.shadowColor = this.color;
+    ctx.fillStyle = this.color;
+
+    ctx.beginPath();
+    ctx.moveTo(0, 8);
+    ctx.bezierCurveTo(-25, -8, -15, -25, 0, -12);
+    ctx.bezierCurveTo(15, -25, 25, -8, 0, 8);
+    ctx.fill();
+
+    ctx.restore();
+  }
+}
+
+class Spark {
+  constructor(x, y, color) {
+    this.x = x;
+    this.y = y;
+    this.vx = (Math.random() - .5) * 7;
+    this.vy = (Math.random() - .5) * 7;
+    this.life = 45 + Math.random() * 30;
+    this.color = color;
+    this.size = Math.random() * 3 + 1;
+  }
+
+  update() {
+    this.x += this.vx;
+    this.y += this.vy;
+    this.life--;
+  }
+
+  draw() {
+    ctx.globalAlpha = Math.max(0, this.life / 75);
+    ctx.fillStyle = this.color;
+    ctx.shadowBlur = 15;
+    ctx.shadowColor = this.color;
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.shadowBlur = 0;
+  }
+}
+
+function burst(x, y, color) {
+  for (let i = 0; i < 35; i++) {
+    particles.push(new Spark(x, y, color));
+  }
+}
+
+for (let i = 0; i < 140; i++) {
+  backgroundParticles.push(new Star());
+}
+
+function updateStats() {
+  document.getElementById("score").textContent = score;
+  document.getElementById("misses").textContent = misses + "/5";
+}
+
+function spawnHeart() {
+  hearts.push(new Heart());
+}
+
+function finish(win) {
+  playing = false;
+  document.getElementById("message").style.display = "flex";
+
+  document.querySelector("#message h2").textContent =
+    win ? "YOU WON! 💙" : "TRY AGAIN";
+
+  document.querySelector("#message p").textContent =
+    win
+      ? "Te adoro y te amo más de lo que crees"
+      : "Tu aventura azul todavía te espera.";
+
+  document.querySelector("#message div:nth-of-type(2)").textContent =
+    win ? "Eres mi corazón favorito." : "¡Puedes volver a intentarlo!";
+}
+
+function startGame() {
+  score = 0;
+  misses = 0;
+  hearts = [];
+  particles = [];
+  playing = true;
+  lastSpawn = 0;
+
+  updateStats();
+
+  document.getElementById("message").style.display = "none";
+  document.getElementById("instructions").style.display = "none";
+  document.getElementById("start").style.display = "none";
+}
+
+function handleTap(x, y) {
+  if (!playing) return;
+
+  let found = -1;
+
+  for (let i = hearts.length - 1; i >= 0; i--) {
+    const heart = hearts[i];
+    const distance = Math.hypot(x - heart.x, y - heart.y);
+
+    if (distance < heart.size + 20) {
+      found = i;
+      break;
+    }
+  }
+
+  if (found !== -1) {
+    const heart = hearts.splice(found, 1)[0];
+
+    burst(heart.x, heart.y, heart.color);
+    score++;
+    updateStats();
+
+    if (score >= 20) {
+      finish(true);
+    }
+  }
+}
+
+canvas.addEventListener("pointerdown", e => {
+  handleTap(e.clientX, e.clientY);
+});
+
+function draw() {
+  ctx.clearRect(0, 0, w, h);
+
+  backgroundParticles.forEach(p => {
+    p.update();
+    p.draw();
+  });
+
+  if (playing) {
+    const now = performance.now();
+
+    if (now - lastSpawn > 850) {
+      spawnHeart();
+      lastSpawn = now;
+    }
+
+    for (let i = hearts.length - 1; i >= 0; i--) {
+      const heart = hearts[i];
+      heart.update();
+      heart.draw();
+
+      if (heart.y > h + 35) {
+        hearts.splice(i, 1);
+        misses++;
+        updateStats();
+
+        if (misses >= 5) {
+          finish(false);
+        }
+      }
+    }
+  }
+
+  for (let i = particles.length - 1; i >= 0; i--) {
+    particles[i].update();
+    particles[i].draw();
+
+    if (particles[i].life <= 0) {
+      particles.splice(i, 1);
+    }
+  }
+
+  animationId = requestAnimationFrame(draw);
+}
+
+document.getElementById("start").addEventListener("click", startGame);
+document.getElementById("restart").addEventListener("click", startGame);
+
+draw();
+</script>
+
+</body>
+</html>
